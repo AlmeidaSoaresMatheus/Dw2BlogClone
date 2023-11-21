@@ -1,62 +1,49 @@
-import { db } from "../db.js";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
+import express from "express";
+// Importação do framework Express para criação do servidor web
+import authRoutes from "./routes/auth.js";
+// Importação das rotas relacionadas à autenticação
+import userRoutes from "./routes/users.js";
+// Importação das rotas relacionadas aos usuários
+import postRoutes from "./routes/posts.js";
+// Importação das rotas relacionadas aos posts
+import cookieParser from "cookie-parser";
+// Importação do middleware para análise de cookies
+import multer from "multer";
+// Importação do middleware para manipulação de uploads de arquivos
 
-export const register = (req, res) => {
-  //CHECK EXISTING USER
-  const q = "SELECT * FROM users WHERE email = ? OR username = ?";
+const app = express();
+// Criação de uma instância do aplicativo Express
 
-  db.query(q, [req.body.email, req.body.username], (err, data) => {
-    if (err) return res.status(500).json(err);
-    if (data.length) return res.status(409).json("User already exists!");
+app.use(express.json());
+// Habilita a análise de requisições JSON no corpo da solicitação
+app.use(cookieParser());
+// Utiliza o middleware cookie-parser para processar cookies
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "../client/public/upload");
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + file.originalname);
+  },
+});
+// Configuração do armazenamento para uploads de arquivos usando o multer
 
-    //Hash the password and create a user
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(req.body.password, salt);
+const upload = multer({ storage });
+// Criação de uma instância do multer com as configurações de armazenamento
 
-    const q = "INSERT INTO users(`username`,`email`,`password`) VALUES (?)";
-    const values = [req.body.username, req.body.email, hash];
+app.post("/api/upload", upload.single("file"), function (req, res) {
+  const file = req.file;
+  // Obtém o arquivo enviado na requisição
+  res.status(200).json(file.filename);
+  // Retorna o nome do arquivo como resposta
+});
 
-    db.query(q, [values], (err, data) => {
-      if (err) return res.status(500).json(err);
-      return res.status(200).json("User has been created.");
-    });
-  });
-};
+// Utiliza as rotas relacionadas aos auth/users/posts no caminho /api/posts
+app.use("/api/auth", authRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/posts", postRoutes);
 
-export const login = (req, res) => {
-  //CHECK USER
 
-  const q = "SELECT * FROM users WHERE username = ?";
-
-  db.query(q, [req.body.username], (err, data) => {
-    if (err) return res.status(500).json(err);
-    if (data.length === 0) return res.status(404).json("User not found!");
-
-    //Check password
-    const isPasswordCorrect = bcrypt.compareSync(
-      req.body.password,
-      data[0].password
-    );
-
-    if (!isPasswordCorrect)
-      return res.status(400).json("Wrong username or password!");
-
-    const token = jwt.sign({ id: data[0].id }, "jwtkey");
-    const { password, ...other } = data[0];
-
-    res
-      .cookie("access_token", token, {
-        httpOnly: true,
-      })
-      .status(200)
-      .json(other);
-  });
-};
-
-export const logout = (req, res) => {
-  res.clearCookie("access_token",{
-    sameSite:"none",
-    secure:true
-  }).status(200).json("User has been logged out.")
-};
+app.listen(8800, () => {
+  console.log("Conectado!");
+});

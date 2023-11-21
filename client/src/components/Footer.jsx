@@ -6,7 +6,7 @@ const Footer = () => {
     <footer>
       <img src={Logo} alt="" />
       <span>
-        Made with ♥️ and <b>React.js</b>.
+        IFSP <b>DW2A4</b>.
       </span>
     </footer>
   );
